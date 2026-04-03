@@ -241,5 +241,14 @@
     "resp": "BIANCO",
     "ars": 102000,
     "usd": 73.12
+  },
+  {
+    "id": 1775247485973,
+    "fecha": "2026-04-03",
+    "cat": "Mano de Obra",
+    "detalle": "Pago4",
+    "resp": "Erica",
+    "ars": 800000,
+    "usd": 573.48
   }
 ]
