@@ -250,5 +250,14 @@
     "resp": "Eric",
     "ars": 800000,
     "usd": 573.48
+  },
+  {
+    "id": 29,
+    "fecha": "2026-04-03",
+    "cat": "Otros",
+    "detalle": "Prueba sistema",
+    "resp": "Peter",
+    "ars": 12345,
+    "usd": 8.85
   }
 ]
