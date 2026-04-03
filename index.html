@@ -480,7 +480,27 @@ function App(){
       setPendingChanges(false);
       setSyncStatus("success");
       setSyncMsg(new Date().toLocaleTimeString("es-AR"));
-    }catch(err){setSyncStatus("error");setSyncMsg(err.message);}
+    }catch(err){
+      if((err.message||"").includes("does not match") || (err.message||"").includes("409")){
+        try{
+          const {gastos:g,sha}=await ghGet(ghConfig);
+          setGastos(g);
+          setGhSha(sha);
+          localStorage.setItem("obras_ghsha",sha);
+          localStorage.setItem("obras_gastos",JSON.stringify(g));
+          setPendingChanges(false);
+          setSyncStatus("error");
+          setSyncMsg("El repo cambió remotamente. Recargué la última versión; revisá los cambios y volvé a guardar.");
+          return;
+        }catch(reloadErr){
+          setSyncStatus("error");
+          setSyncMsg(reloadErr.message || err.message);
+          return;
+        }
+      }
+      setSyncStatus("error");
+      setSyncMsg(err.message);
+    }
   }
 
   async function handleSaveConfig(cfg){
