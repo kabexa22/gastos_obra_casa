@@ -250,5 +250,14 @@
     "resp": "Manuel",
     "ars": 220000,
     "usd": 0
+  },
+  {
+    "id": 28,
+    "fecha": "2026-04-03",
+    "cat": "Mano de Obra",
+    "detalle": "Pago4",
+    "resp": "Eric",
+    "ars": 800000,
+    "usd": 573.48
   }
 ]
