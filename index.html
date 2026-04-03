@@ -10,87 +10,111 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;padding:1rem;}
-  input,select{padding:8px 10px;border:1px solid #d0d0cc;border-radius:8px;font-size:14px;width:100%;background:#fff;color:#1a1a1a;}
-  input:focus,select:focus{outline:2px solid #7F77DD;border-color:transparent;}
+  input,select,textarea{padding:8px 10px;border:1px solid #d0d0cc;border-radius:8px;font-size:14px;width:100%;background:#fff;color:#1a1a1a;}
+  input:focus,select:focus,textarea:focus{outline:2px solid #7F77DD;border-color:transparent;}
   button{cursor:pointer;}
   .card{background:#fff;border:0.5px solid rgba(0,0,0,0.1);border-radius:12px;padding:1rem 1.25rem;}
   .metric{background:#f5f5f3;border-radius:8px;padding:1rem;}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem;}
+  .modal-box{background:#fff;border-radius:16px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.18);}
+  .btn-primary{padding:8px 20px;border-radius:8px;border:1px solid #7F77DD;background:#7F77DD;color:#fff;font-size:14px;font-weight:500;}
+  .btn-primary:hover{background:#6a63c8;}
+  .btn-ghost{padding:8px 20px;border-radius:8px;border:1px solid #d0d0cc;background:#fff;color:#1a1a1a;font-size:14px;}
+  .btn-ghost:hover{background:#f5f5f3;}
+  .btn-icon{background:none;border:none;padding:4px 6px;border-radius:6px;font-size:15px;color:#999;line-height:1;}
+  .btn-icon:hover{background:#f0f0ee;color:#1a1a1a;}
+  .tag{font-size:11px;padding:2px 8px;border-radius:8px;background:#f0f0ee;color:#666;}
+  .field-label{font-size:13px;color:#666;margin-bottom:4px;}
+  .alert{border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;}
+  .alert-warn{background:#fff8ec;border:1px solid #f5c96a;color:#8a5c00;}
+  .alert-danger{background:#fff0f0;border:1px solid #f5a0a0;color:#8a0000;}
+  .alert-info{background:#f0f4ff;border:1px solid #b0c0f0;color:#2a3a8a;}
+  .search-bar{display:flex;align-items:center;background:#fff;border:1px solid #d0d0cc;border-radius:8px;padding:0 10px;gap:6px;}
+  .search-bar input{border:none;outline:none;padding:8px 0;background:transparent;}
+  .search-bar input:focus{outline:none;}
+  .sync-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;}
+  code{font-family:monospace;background:#f0f0ee;padding:1px 5px;border-radius:4px;font-size:12px;}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useMemo}=React;
+const {useState, useMemo, useEffect, useRef} = React;
 
-const PRESUPUESTO_USD=11368.46;
-const CAT_COLORS={"Mano de Obra":"#7F77DD","Materiales":"#1D9E75","Otros":"#EF9F27"};
-const TIPO_COLORS={"Trabajo Casa":"#7F77DD","Material Estimado":"#1D9E75","Falta Cotizar":"#EF9F27"};
-const CATS=["Mano de Obra","Materiales","Otros"];
-const MONTHS=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+// ─── Constantes ────────────────────────────────────────────────────────────
+const TODAY = new Date().toISOString().split('T')[0];
+const PRESUPUESTO_USD = 11368.46;
+const CAT_COLORS  = {"Mano de Obra":"#7F77DD","Materiales":"#1D9E75","Otros":"#EF9F27"};
+const TIPO_COLORS = {"Trabajo Casa":"#7F77DD","Material Estimado":"#1D9E75","Falta Cotizar":"#EF9F27"};
+const CATS   = ["Mano de Obra","Materiales","Otros"];
+const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const EMPTY_FORM   = {fecha:TODAY, cat:"Mano de Obra", detalle:"", resp:"", ars:"", usd:""};
+const EMPTY_CONFIG = {owner:"", repo:"", branch:"main", path:"data.json", token:""};
 
-const GASTOS_INIT=[
-  {id:1,fecha:"2026-03-01",cat:"Mano de Obra",detalle:"Pago inicial Eric",resp:"Eric",ars:1000000,usd:716.85},
-  {id:2,fecha:"2026-03-02",cat:"Mano de Obra",detalle:"Agua entrada",resp:"Juan",ars:373000,usd:267.38},
-  {id:3,fecha:"2026-03-03",cat:"Otros",detalle:"Adelanto",resp:"Eric",ars:300000,usd:215.05},
-  {id:4,fecha:"2026-03-04",cat:"Mano de Obra",detalle:"Final del tanque y materiales caños",resp:"Juan",ars:840000,usd:602.15},
-  {id:5,fecha:"2026-03-05",cat:"Mano de Obra",detalle:"Pago1",resp:"Eric",ars:1320000,usd:946.24},
-  {id:6,fecha:"2026-03-06",cat:"Mano de Obra",detalle:"Pago2",resp:"Eric",ars:1200000,usd:860.22},
-  {id:7,fecha:"2026-03-14",cat:"Materiales",detalle:"Materiales pintura",resp:"REX",ars:2100000,usd:1505.38},
-  {id:8,fecha:"2026-03-02",cat:"Materiales",detalle:"Tanque y depósito",resp:"ACCESANIGA",ars:316000,usd:226.52},
-  {id:9,fecha:"2026-03-03",cat:"Materiales",detalle:"Yeso",resp:"YESO",ars:42500,usd:30.47},
-  {id:10,fecha:"2026-03-23",cat:"Materiales",detalle:"Cinta impermeabilizante",resp:"CINTA IMPERM.",ars:41000,usd:29.39},
-  {id:11,fecha:"2026-03-25",cat:"Materiales",detalle:"Pintura marcos",resp:"PINTURA MARCOS",ars:75000,usd:53.76},
-  {id:12,fecha:"2026-03-25",cat:"Materiales",detalle:"Pintura pieza Isabel",resp:"Pinturería Italia y Salta",ars:41000,usd:29.39},
-  {id:13,fecha:"2026-03-21",cat:"Materiales",detalle:"Cerámicos/grifería/sanitario",resp:"ACCESANIGA",ars:797000,usd:571.33},
-  {id:14,fecha:"2026-03-21",cat:"Materiales",detalle:"Durlock",resp:"Durline",ars:330000,usd:236.56},
-  {id:15,fecha:"2026-03-21",cat:"Materiales",detalle:"Cerámicos patio",resp:"ACCESANIGA",ars:168000,usd:120.43},
-  {id:16,fecha:"2026-03-25",cat:"Materiales",detalle:"Materiales plomería Cocina/Patio",resp:"Juan",ars:68000,usd:48.75},
-  {id:17,fecha:"2026-03-25",cat:"Materiales",detalle:"Materiales plomería Cocina",resp:"Juan",ars:114000,usd:81.72},
-  {id:18,fecha:"2026-03-27",cat:"Materiales",detalle:"Volquete",resp:"RODO",ars:120000,usd:86.02},
-  {id:19,fecha:"2026-03-26",cat:"Materiales",detalle:"Pegamento cerámicos y pastina",resp:"ACCESANIGA",ars:179569,usd:128.72},
-  {id:20,fecha:"2026-03-03",cat:"Mano de Obra",detalle:"Flete tanque",resp:"FLETE COLO",ars:25000,usd:17.92},
-  {id:21,fecha:"2026-03-27",cat:"Materiales",detalle:"Materiales construcción",resp:"La Rosario Norte",ars:277370.65,usd:198.83},
-  {id:22,fecha:"2026-03-26",cat:"Otros",detalle:"Termotanque y Estufa",resp:"TIENDABNA",ars:899000,usd:644.44},
-  {id:23,fecha:"2026-03-27",cat:"Mano de Obra",detalle:"Pago3",resp:"Eric",ars:1000000,usd:716.85},
-  {id:24,fecha:"2026-03-27",cat:"Mano de Obra",detalle:"Caños agua cocina (Manuel)",resp:"Juan",ars:250000,usd:179.21},
-  {id:25,fecha:"2026-03-10",cat:"Materiales",detalle:"Flexible Cocina",resp:"Plomgas",ars:16000,usd:11.47},
-  {id:26,fecha:"2026-03-10",cat:"Mano de Obra",detalle:"Cocina",resp:"Juan",ars:604000,usd:432.97},
-  {id:27,fecha:"2026-03-10",cat:"Materiales",detalle:"Azulejos Cocina",resp:"BIANCO",ars:102000,usd:73.12},
+const GASTOS_INIT = [
+  {id:1,  fecha:"2026-03-01",cat:"Mano de Obra",detalle:"Pago inicial Eric",           resp:"Eric",             ars:1000000,   usd:716.85},
+  {id:2,  fecha:"2026-03-02",cat:"Mano de Obra",detalle:"Agua entrada",                resp:"Juan",             ars:373000,    usd:267.38},
+  {id:3,  fecha:"2026-03-03",cat:"Otros",        detalle:"Adelanto",                   resp:"Eric",             ars:300000,    usd:215.05},
+  {id:4,  fecha:"2026-03-04",cat:"Mano de Obra",detalle:"Final tanque y caños",        resp:"Juan",             ars:840000,    usd:602.15},
+  {id:5,  fecha:"2026-03-05",cat:"Mano de Obra",detalle:"Pago1",                       resp:"Eric",             ars:1320000,   usd:946.24},
+  {id:6,  fecha:"2026-03-06",cat:"Mano de Obra",detalle:"Pago2",                       resp:"Eric",             ars:1200000,   usd:860.22},
+  {id:7,  fecha:"2026-03-14",cat:"Materiales",  detalle:"Materiales pintura",          resp:"REX",              ars:2100000,   usd:1505.38},
+  {id:8,  fecha:"2026-03-02",cat:"Materiales",  detalle:"Tanque y depósito",           resp:"ACCESANIGA",       ars:316000,    usd:226.52},
+  {id:9,  fecha:"2026-03-03",cat:"Materiales",  detalle:"Yeso",                        resp:"YESO",             ars:42500,     usd:30.47},
+  {id:10, fecha:"2026-03-23",cat:"Materiales",  detalle:"Cinta impermeabilizante",     resp:"CINTA IMPERM.",    ars:41000,     usd:29.39},
+  {id:11, fecha:"2026-03-25",cat:"Materiales",  detalle:"Pintura marcos",              resp:"PINTURA MARCOS",   ars:75000,     usd:53.76},
+  {id:12, fecha:"2026-03-25",cat:"Materiales",  detalle:"Pintura pieza Isabel",        resp:"Pinturería Italia",ars:41000,     usd:29.39},
+  {id:13, fecha:"2026-03-21",cat:"Materiales",  detalle:"Cerámicos/grifería/sanitario",resp:"ACCESANIGA",       ars:797000,    usd:571.33},
+  {id:14, fecha:"2026-03-21",cat:"Materiales",  detalle:"Durlock",                     resp:"Durline",          ars:330000,    usd:236.56},
+  {id:15, fecha:"2026-03-21",cat:"Materiales",  detalle:"Cerámicos patio",             resp:"ACCESANIGA",       ars:168000,    usd:120.43},
+  {id:16, fecha:"2026-03-25",cat:"Materiales",  detalle:"Materiales plomería Cocina/Patio",resp:"Juan",         ars:68000,     usd:48.75},
+  {id:17, fecha:"2026-03-25",cat:"Materiales",  detalle:"Materiales plomería Cocina",  resp:"Juan",             ars:114000,    usd:81.72},
+  {id:18, fecha:"2026-03-27",cat:"Materiales",  detalle:"Volquete",                    resp:"RODO",             ars:120000,    usd:86.02},
+  {id:19, fecha:"2026-03-26",cat:"Materiales",  detalle:"Pegamento cerámicos y pastina",resp:"ACCESANIGA",      ars:179569,    usd:128.72},
+  {id:20, fecha:"2026-03-03",cat:"Mano de Obra",detalle:"Flete tanque",                resp:"FLETE COLO",       ars:25000,     usd:17.92},
+  {id:21, fecha:"2026-03-27",cat:"Materiales",  detalle:"Materiales construcción",     resp:"La Rosario Norte", ars:277370.65, usd:198.83},
+  {id:22, fecha:"2026-03-26",cat:"Otros",        detalle:"Termotanque y Estufa",        resp:"TIENDABNA",        ars:899000,    usd:644.44},
+  {id:23, fecha:"2026-03-27",cat:"Mano de Obra",detalle:"Pago3",                       resp:"Eric",             ars:1000000,   usd:716.85},
+  {id:24, fecha:"2026-03-27",cat:"Mano de Obra",detalle:"Caños agua cocina (Manuel)",  resp:"Juan",             ars:250000,    usd:179.21},
+  {id:25, fecha:"2026-03-10",cat:"Materiales",  detalle:"Flexible Cocina",             resp:"Plomgas",          ars:16000,     usd:11.47},
+  {id:26, fecha:"2026-03-10",cat:"Mano de Obra",detalle:"Cocina",                      resp:"Juan",             ars:604000,    usd:432.97},
+  {id:27, fecha:"2026-03-10",cat:"Materiales",  detalle:"Azulejos Cocina",             resp:"BIANCO",           ars:102000,    usd:73.12},
 ];
 
-const PRESUPUESTO_ITEMS=[
-  {tipo:"Trabajo Casa",detalle:"Agua entrada (Juan)",ars:396000,usd:283.87},
-  {tipo:"Trabajo Casa",detalle:"Poner tanques (Juan)",ars:663000,usd:475.27},
-  {tipo:"Trabajo Casa",detalle:"Eric (pintado, machimbre, durlock)",ars:4500000,usd:3225.81},
-  {tipo:"Trabajo Casa",detalle:"Pintura depto (Iván)",ars:500000,usd:358.42},
-  {tipo:"Trabajo Casa",detalle:"Pulido piso (amigo Eric)",ars:1300000,usd:931.90},
-  {tipo:"Trabajo Casa",detalle:"Baño completo (Eric)",ars:1000000,usd:716.85},
-  {tipo:"Trabajo Casa",detalle:"Trabajo cocina (Juan)",ars:200000,usd:143.37},
-  {tipo:"Trabajo Casa",detalle:"Rejas",ars:790000,usd:566.31},
-  {tipo:"Trabajo Casa",detalle:"Piso patio",ars:1200000,usd:860.22},
-  {tipo:"Trabajo Casa",detalle:"Flete tanque",ars:25000,usd:17.92},
-  {tipo:"Material Estimado",detalle:"REX",ars:2100000,usd:1505.38},
-  {tipo:"Material Estimado",detalle:"Cerámicos baño",ars:300000,usd:215.05},
-  {tipo:"Material Estimado",detalle:"Vanitorio",ars:375000,usd:268.82},
-  {tipo:"Material Estimado",detalle:"Azulejos cocina",ars:50000,usd:35.84},
-  {tipo:"Falta Cotizar",detalle:"Termotanque",ars:450000,usd:322.58},
-  {tipo:"Falta Cotizar",detalle:"Aire acondicionado",ars:200000,usd:143.37},
-  {tipo:"Falta Cotizar",detalle:"Estufa",ars:360000,usd:258.06},
-  {tipo:"Falta Cotizar",detalle:"Mudanza",ars:600000,usd:430.11},
-  {tipo:"Falta Cotizar",detalle:"Alquiler",ars:850000,usd:609.32},
+const PRESUPUESTO_ITEMS = [
+  {tipo:"Trabajo Casa",     detalle:"Agua entrada (Juan)",                ars:396000,  usd:283.87},
+  {tipo:"Trabajo Casa",     detalle:"Poner tanques (Juan)",               ars:663000,  usd:475.27},
+  {tipo:"Trabajo Casa",     detalle:"Eric (pintado, machimbre, durlock)", ars:4500000, usd:3225.81},
+  {tipo:"Trabajo Casa",     detalle:"Pintura depto (Iván)",               ars:500000,  usd:358.42},
+  {tipo:"Trabajo Casa",     detalle:"Pulido piso (amigo Eric)",           ars:1300000, usd:931.90},
+  {tipo:"Trabajo Casa",     detalle:"Baño completo (Eric)",               ars:1000000, usd:716.85},
+  {tipo:"Trabajo Casa",     detalle:"Trabajo cocina (Juan)",              ars:200000,  usd:143.37},
+  {tipo:"Trabajo Casa",     detalle:"Rejas",                              ars:790000,  usd:566.31},
+  {tipo:"Trabajo Casa",     detalle:"Piso patio",                         ars:1200000, usd:860.22},
+  {tipo:"Trabajo Casa",     detalle:"Flete tanque",                       ars:25000,   usd:17.92},
+  {tipo:"Material Estimado",detalle:"REX",                                ars:2100000, usd:1505.38},
+  {tipo:"Material Estimado",detalle:"Cerámicos baño",                     ars:300000,  usd:215.05},
+  {tipo:"Material Estimado",detalle:"Vanitorio",                          ars:375000,  usd:268.82},
+  {tipo:"Material Estimado",detalle:"Azulejos cocina",                    ars:50000,   usd:35.84},
+  {tipo:"Falta Cotizar",    detalle:"Termotanque",                        ars:450000,  usd:322.58},
+  {tipo:"Falta Cotizar",    detalle:"Aire acondicionado",                 ars:200000,  usd:143.37},
+  {tipo:"Falta Cotizar",    detalle:"Estufa",                             ars:360000,  usd:258.06},
+  {tipo:"Falta Cotizar",    detalle:"Mudanza",                            ars:600000,  usd:430.11},
+  {tipo:"Falta Cotizar",    detalle:"Alquiler",                           ars:850000,  usd:609.32},
 ];
 
-const CUOTAS_RAW=[
-  {fecha:"2026-03-02",detalle:"Tanque Agua",resp:"ACCESANIGA",total:315000,cuotas:3,xCuota:105000},
-  {fecha:"2026-03-14",detalle:"Pinturas",resp:"REX",total:2100000,cuotas:12,xCuota:175000},
-  {fecha:"2026-03-21",detalle:"Cerámicos/piso/griferías",resp:"ACCESANIGA",total:997252,cuotas:6,xCuota:166208.67},
-  {fecha:"2026-03-27",detalle:"Pegamento/pastina",resp:"ACCESANIGA",total:179569,cuotas:6,xCuota:29928.17},
-  {fecha:"2026-03-21",detalle:"Durlock y otros",resp:"DURLINE",total:330000,cuotas:6,xCuota:55000},
-  {fecha:"2026-03-26",detalle:"Termotanque y Estufa",resp:"TIENDABNA",total:899000,cuotas:24,xCuota:37458.33},
-  {fecha:"2026-03-28",detalle:"Cerámicos Cocina",resp:"BIANCO",total:102000,cuotas:3,xCuota:34000},
+const CUOTAS_RAW = [
+  {fecha:"2026-03-02",detalle:"Tanque Agua",            resp:"ACCESANIGA",total:315000,   cuotas:3, xCuota:105000},
+  {fecha:"2026-03-14",detalle:"Pinturas",                resp:"REX",       total:2100000,  cuotas:12,xCuota:175000},
+  {fecha:"2026-03-21",detalle:"Cerámicos/piso/griferías",resp:"ACCESANIGA",total:997252,   cuotas:6, xCuota:166208.67},
+  {fecha:"2026-03-27",detalle:"Pegamento/pastina",       resp:"ACCESANIGA",total:179569,   cuotas:6, xCuota:29928.17},
+  {fecha:"2026-03-21",detalle:"Durlock y otros",         resp:"DURLINE",   total:330000,   cuotas:6, xCuota:55000},
+  {fecha:"2026-03-26",detalle:"Termotanque y Estufa",    resp:"TIENDABNA", total:899000,   cuotas:24,xCuota:37458.33},
+  {fecha:"2026-03-28",detalle:"Cerámicos Cocina",        resp:"BIANCO",    total:102000,   cuotas:3, xCuota:34000},
 ];
 
-function addMonths(dateStr,n){
+// ─── Helpers ───────────────────────────────────────────────────────────────
+function addMonths(dateStr, n){
   const [y,m,d]=dateStr.split("-").map(Number);
   const dt=new Date(y,m-1+n,d);
   return{y:dt.getFullYear(),m:dt.getMonth()+1};
@@ -98,33 +122,193 @@ function addMonths(dateStr,n){
 function fmtARS(n){return "$"+Math.round(n).toLocaleString("es-AR");}
 function fmtUSD(n){return "U$S "+n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function pct(a,b){return b===0?0:Math.round(a/b*100);}
+function cuotaStatus(y,m){
+  const n=new Date(),ny=n.getFullYear(),nm=n.getMonth()+1;
+  if(y<ny||(y===ny&&m<nm))return "pagada";
+  if(y===ny&&m===nm)return "actual";
+  return "pendiente";
+}
 
-function TarjetaView({totalUSD,saldo}){
-  const [dolar,setDolar]=useState(1395);
+// ─── GitHub API ─────────────────────────────────────────────────────────────
+async function ghGet(cfg){
+  const res=await fetch(
+    `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}?ref=${cfg.branch}`,
+    {headers:{Authorization:`token ${cfg.token}`,Accept:"application/vnd.github.v3+json"}}
+  );
+  if(!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
+  const data=await res.json();
+  const text=decodeURIComponent(escape(atob(data.content.replace(/\s/g,""))));
+  return{gastos:JSON.parse(text), sha:data.sha};
+}
+
+async function ghPut(cfg, gastos, sha){
+  const text=JSON.stringify(gastos,null,2);
+  const content=btoa(unescape(encodeURIComponent(text)));
+  const body={
+    message:`Actualizar gastos · ${new Date().toLocaleString("es-AR")}`,
+    content, branch:cfg.branch, ...(sha?{sha}:{})
+  };
+  const res=await fetch(
+    `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${cfg.path}`,
+    {method:"PUT",headers:{Authorization:`token ${cfg.token}`,"Content-Type":"application/json"},body:JSON.stringify(body)}
+  );
+  if(!res.ok){const e=await res.json();throw new Error(e.message||`Error ${res.status}`);}
+  const data=await res.json();
+  return data.content.sha;
+}
+
+// ─── CSV Export / Import ───────────────────────────────────────────────────
+function exportCSV(gastos){
+  const headers=["id","fecha","cat","detalle","resp","ars","usd"];
+  const rows=gastos.map(g=>headers.map(h=>`"${String(g[h]).replace(/"/g,'""')}"`).join(","));
+  const csv=[headers.join(","),...rows].join("\n");
+  const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="gastos-obra.csv";a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function parseCSV(text){
+  const lines=text.replace(/\r/g,"").split("\n").filter(l=>l.trim());
+  const headers=lines[0].split(",").map(h=>h.replace(/^"|"$/g,"").trim());
+  return lines.slice(1).map(line=>{
+    const vals=[];let cur="",inQ=false;
+    for(const ch of line){if(ch==='"'){inQ=!inQ;}else if(ch===","&&!inQ){vals.push(cur);cur="";}else cur+=ch;}
+    vals.push(cur);
+    const obj={};
+    headers.forEach((h,i)=>{
+      let v=(vals[i]||"").replace(/^"|"$/g,"").replace(/""/g,'"').trim();
+      if(h==="ars"||h==="usd") v=parseFloat(v)||0;
+      else if(h==="id") v=parseInt(v)||Date.now()+i;
+      obj[h]=v;
+    });
+    return obj;
+  }).filter(g=>g.detalle);
+}
+
+// ─── Gráfico Dona ─────────────────────────────────────────────────────────
+function DonutChart({segments,size=140}){
+  const total=segments.reduce((s,d)=>s+d.value,0);
+  if(total===0)return null;
+  const cx=size/2,cy=size/2,R=size*0.40,r=size*0.25;
+  let cum=0;
+  const slices=segments.map(d=>{
+    const start=cum/total*2*Math.PI;cum+=d.value;const end=cum/total*2*Math.PI;
+    return{...d,start,end};
+  });
+  function arc(a,rad){return{x:cx+rad*Math.sin(a),y:cy-rad*Math.cos(a)};}
+  function path(s,e,O,I){
+    const p1=arc(s,O),p2=arc(e,O),p3=arc(e,I),p4=arc(s,I),lg=e-s>Math.PI?1:0;
+    return `M${p1.x},${p1.y} A${O},${O} 0 ${lg},1 ${p2.x},${p2.y} L${p3.x},${p3.y} A${I},${I} 0 ${lg},0 ${p4.x},${p4.y}Z`;
+  }
+  return(
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{flexShrink:0}}>
+      {slices.map((s,i)=>(
+        <path key={i} d={path(s.start,s.end,R,r)} fill={s.color}>
+          <title>{s.label}: {Math.round(s.value/total*100)}%</title>
+        </path>
+      ))}
+    </svg>
+  );
+}
+
+// ─── Modal gasto ──────────────────────────────────────────────────────────
+function GastoModal({gasto,dolar,onSave,onClose,title}){
+  const [form,setForm]=useState(gasto||{...EMPTY_FORM});
+  function set(k,v){setForm(p=>({...p,[k]:v}));}
+  function handleARS(v){set("ars",v);if(dolar&&parseFloat(v)>0)set("usd",(parseFloat(v)/dolar).toFixed(2));}
+  function handleUSD(v){set("usd",v);if(dolar&&parseFloat(v)>0)set("ars",Math.round(parseFloat(v)*dolar).toString());}
+  function handleSave(){
+    if(!form.fecha||!form.detalle||(form.ars===""&&form.usd===""))return;
+    onSave({...form,ars:parseFloat(form.ars)||0,usd:parseFloat(form.usd)||0});
+  }
+  return(
+    <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}>
+          <div style={{fontSize:"15px",fontWeight:500}}>{title}</div>
+          <button className="btn-icon" onClick={onClose} style={{fontSize:"20px"}}>×</button>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+          <div><div className="field-label">Fecha</div><input type="date" value={form.fecha} onChange={e=>set("fecha",e.target.value)}/></div>
+          <div><div className="field-label">Categoría</div>
+            <select value={form.cat} onChange={e=>set("cat",e.target.value)}>{CATS.map(c=><option key={c}>{c}</option>)}</select>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><div className="field-label">Detalle</div>
+            <input type="text" value={form.detalle} placeholder="Ej: Pago4 Eric" onChange={e=>set("detalle",e.target.value)}/>
+          </div>
+          <div style={{gridColumn:"1/-1"}}><div className="field-label">Responsable / Proveedor</div>
+            <input type="text" value={form.resp} placeholder="Ej: Eric" onChange={e=>set("resp",e.target.value)}/>
+          </div>
+          <div><div className="field-label">Monto ARS</div>
+            <input type="number" value={form.ars} placeholder="0" onChange={e=>handleARS(e.target.value)}/>
+          </div>
+          <div><div className="field-label">Equivalente USD</div>
+            <input type="number" value={form.usd} placeholder="0" onChange={e=>handleUSD(e.target.value)}/>
+          </div>
+        </div>
+        <div style={{fontSize:"12px",color:"#999",marginTop:"8px"}}>
+          Tipo de cambio activo: {fmtARS(dolar)} · Los montos se calculan entre sí.
+        </div>
+        <div style={{display:"flex",gap:"8px",marginTop:"1.25rem"}}>
+          <button className="btn-primary" onClick={handleSave}>Guardar</button>
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmModal({mensaje,onConfirm,onClose}){
+  return(
+    <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box" style={{maxWidth:"360px"}}>
+        <div style={{fontSize:"15px",fontWeight:500,marginBottom:"12px"}}>Confirmar</div>
+        <div style={{fontSize:"14px",color:"#444",marginBottom:"1.5rem"}}>{mensaje}</div>
+        <div style={{display:"flex",gap:"8px"}}>
+          <button className="btn-primary" style={{background:"#c0392b",borderColor:"#c0392b"}} onClick={onConfirm}>Eliminar</button>
+          <button className="btn-ghost" onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Tab Tarjeta ──────────────────────────────────────────────────────────
+function TarjetaView({dolar}){
   const cuotasPorMes=useMemo(()=>{
     const map={};
     CUOTAS_RAW.forEach(item=>{
       for(let i=0;i<item.cuotas;i++){
-        const {y,m}=addMonths(item.fecha,i);
+        const{y,m}=addMonths(item.fecha,i);
         const key=`${y}-${String(m).padStart(2,"0")}`;
         if(!map[key])map[key]={ars:0,items:[]};
         map[key].ars+=item.xCuota;
-        map[key].items.push({detalle:item.detalle,resp:item.resp,cuota:i+1,total:item.cuotas,monto:item.xCuota});
+        map[key].items.push({detalle:item.detalle,resp:item.resp,cuota:i+1,total:item.cuotas,monto:item.xCuota,status:cuotaStatus(y,m)});
       }
     });
     return map;
   },[]);
   const meses=useMemo(()=>Object.keys(cuotasPorMes).sort(),[cuotasPorMes]);
-  const [expandido,setExpandido]=useState(null);
+  const[expandido,setExpandido]=useState(null);
   const maxARS=Math.max(...Object.values(cuotasPorMes).map(v=>v.ars),1);
   const totalGeneral=CUOTAS_RAW.reduce((s,i)=>s+i.total,0);
+  const cuotaMensual=602595.17;
+  const countPagadas =meses.filter(k=>{const[y,m]=k.split("-").map(Number);return cuotaStatus(y,m)==="pagada";}).length;
+  const countActual  =meses.filter(k=>{const[y,m]=k.split("-").map(Number);return cuotaStatus(y,m)==="actual";}).length;
+  const countPendiente=meses.filter(k=>{const[y,m]=k.split("-").map(Number);return cuotaStatus(y,m)==="pendiente";}).length;
+  const stStyle={
+    pagada:   {background:"#e8f5e9",color:"#2e7d32",text:"✓ Pagada"},
+    actual:   {background:"#fff8ec",color:"#8a5c00",text:"⬤ Este mes"},
+    pendiente:{background:"#f5f5f3",color:"#888",   text:"Pendiente"},
+  };
   return(
     <div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px",marginBottom:"1.5rem"}}>
         {[
           {l:"Total en cuotas ARS",v:fmtARS(totalGeneral)},
           {l:"Total en cuotas USD",v:fmtUSD(totalGeneral/dolar)},
-          {l:"Cuota mensual total",v:fmtARS(602595.17)},
+          {l:"Cuota mensual total",v:fmtARS(cuotaMensual)},
           {l:"Meses con vencimientos",v:meses.length},
         ].map(m=>(
           <div key={m.l} className="metric">
@@ -133,35 +317,57 @@ function TarjetaView({totalUSD,saldo}){
           </div>
         ))}
       </div>
-      <div className="card" style={{marginBottom:"1.5rem",display:"flex",alignItems:"center",gap:"16px",flexWrap:"wrap"}}>
-        <span style={{fontSize:"13px",color:"#666"}}>Cotización USD:</span>
-        <input type="number" value={dolar} onChange={e=>setDolar(Number(e.target.value))} style={{width:"110px"}}/>
-        <span style={{fontSize:"13px",color:"#666"}}>· Cuota mensual: <strong>{fmtUSD(602595.17/dolar)}</strong></span>
+      <div className="card" style={{marginBottom:"1.5rem",display:"flex",gap:"20px",flexWrap:"wrap",alignItems:"center"}}>
+        <span style={{fontSize:"13px",color:"#666"}}>Estado de cuotas</span>
+        {[
+          {label:"Pagadas",count:countPagadas,color:"#2e7d32",bg:"#e8f5e9"},
+          {label:"Este mes",count:countActual,color:"#8a5c00",bg:"#fff8ec"},
+          {label:"Pendientes",count:countPendiente,color:"#555",bg:"#f0f0ee"},
+        ].map(s=>(
+          <div key={s.label} style={{display:"flex",alignItems:"center",gap:"6px"}}>
+            <span style={{fontSize:"18px",fontWeight:600,color:s.color}}>{s.count}</span>
+            <span style={{fontSize:"12px",padding:"2px 8px",borderRadius:"8px",background:s.bg,color:s.color}}>{s.label}</span>
+          </div>
+        ))}
+        <div style={{marginLeft:"auto",fontSize:"13px",color:"#666"}}>
+          Cuota USD: <strong>{fmtUSD(cuotaMensual/dolar)}</strong>
+        </div>
       </div>
       <div className="card" style={{marginBottom:"1.5rem"}}>
         <div style={{fontSize:"14px",fontWeight:500,marginBottom:"1rem"}}>Vencimientos mensuales</div>
         {meses.map(key=>{
-          const {ars,items}=cuotasPorMes[key];
-          const [y,m]=key.split("-");
-          const label=`${MONTHS[parseInt(m)-1]} ${y}`;
+          const{ars,items}=cuotasPorMes[key];
+          const[y,m]=key.split("-").map(Number);
+          const label=`${MONTHS[m-1]} ${y}`;
           const w=Math.round(ars/maxARS*100);
           const isOpen=expandido===key;
+          const st=cuotaStatus(y,m);
+          const rowColor=st==="pagada"?"#1D9E75":st==="actual"?"#EF9F27":"#7F77DD";
           return(
             <div key={key}>
-              <div onClick={()=>setExpandido(isOpen?null:key)} style={{cursor:"pointer",display:"flex",alignItems:"center",gap:"10px",padding:"4px 0"}}>
+              <div onClick={()=>setExpandido(isOpen?null:key)}
+                style={{cursor:"pointer",display:"flex",alignItems:"center",gap:"10px",padding:"4px 0"}}>
                 <span style={{fontSize:"12px",color:"#666",width:"60px",flexShrink:0}}>{label}</span>
                 <div style={{flex:1,height:"20px",background:"#f0f0ee",borderRadius:"4px",overflow:"hidden"}}>
-                  <div style={{height:"100%",width:w+"%",background:"#7F77DD",borderRadius:"4px"}}/>
+                  <div style={{height:"100%",width:w+"%",background:rowColor,borderRadius:"4px",opacity:st==="pagada"?0.5:1}}/>
                 </div>
                 <span style={{fontSize:"12px",color:"#666",width:"110px",textAlign:"right",flexShrink:0}}>{fmtARS(Math.round(ars))}</span>
+                <span style={{fontSize:"11px",padding:"1px 6px",borderRadius:"6px",
+                  background:stStyle[st].background,color:stStyle[st].color,flexShrink:0,width:"84px",textAlign:"center"}}>
+                  {stStyle[st].text}
+                </span>
                 <span style={{fontSize:"12px",color:"#999",width:"14px",textAlign:"center"}}>{isOpen?"▲":"▼"}</span>
               </div>
               {isOpen&&(
                 <div style={{marginLeft:"70px",marginBottom:"6px",display:"flex",flexDirection:"column",gap:"4px"}}>
                   {items.map((it,i)=>(
-                    <div key={i} style={{background:"#f5f5f3",borderRadius:"8px",padding:"6px 10px",fontSize:"12px",display:"flex",justifyContent:"space-between"}}>
-                      <span style={{color:"#666"}}>{it.detalle} <span style={{color:"#999"}}>({it.cuota}/{it.total})</span></span>
-                      <span style={{fontWeight:500}}>{fmtARS(Math.round(it.monto))}</span>
+                    <div key={i} style={{background:stStyle[it.status].background,borderRadius:"8px",padding:"6px 10px",
+                      fontSize:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{color:"#555"}}>{it.detalle} <span style={{color:"#999"}}>({it.cuota}/{it.total})</span></span>
+                      <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                        <span style={{fontWeight:500}}>{fmtARS(Math.round(it.monto))}</span>
+                        <span style={{fontSize:"10px",color:stStyle[it.status].color}}>{stStyle[it.status].text}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -174,16 +380,32 @@ function TarjetaView({totalUSD,saldo}){
         <div style={{fontSize:"14px",fontWeight:500,marginBottom:"1rem"}}>Compras en cuotas</div>
         {CUOTAS_RAW.map((item,i)=>{
           const fin=addMonths(item.fecha,item.cuotas-1);
+          const pagadas=Array.from({length:item.cuotas},(_,k)=>{
+            const{y,m}=addMonths(item.fecha,k);return cuotaStatus(y,m)==="pagada";
+          }).filter(Boolean).length;
           return(
-            <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:i<CUOTAS_RAW.length-1?"0.5px solid #e0e0dc":"none",gap:"12px"}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:"13px",fontWeight:500}}>{item.detalle}</div>
-                <div style={{fontSize:"12px",color:"#666"}}>{item.resp} · {item.cuotas} cuotas · vence {MONTHS[fin.m-1]} {fin.y}</div>
+            <div key={i} style={{padding:"8px 0",borderBottom:i<CUOTAS_RAW.length-1?"0.5px solid #e0e0dc":"none"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:"13px",fontWeight:500}}>{item.detalle}</div>
+                  <div style={{fontSize:"12px",color:"#666"}}>{item.resp} · vence {MONTHS[fin.m-1]} {fin.y}</div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:"13px",fontWeight:500}}>{fmtARS(item.total)}</div>
+                  <div style={{fontSize:"12px",color:"#666"}}>{fmtARS(Math.round(item.xCuota))}/mes</div>
+                </div>
               </div>
-              <div style={{textAlign:"right",flexShrink:0}}>
-                <div style={{fontSize:"13px",fontWeight:500}}>{fmtARS(item.total)}</div>
-                <div style={{fontSize:"12px",color:"#666"}}>{fmtARS(Math.round(item.xCuota))}/mes</div>
+              <div style={{marginTop:"6px",display:"flex",gap:"2px"}}>
+                {Array.from({length:item.cuotas},(_,k)=>{
+                  const{y,m}=addMonths(item.fecha,k);const st=cuotaStatus(y,m);
+                  return(
+                    <div key={k} title={`Cuota ${k+1}: ${MONTHS[m-1]} ${y}`}
+                      style={{flex:1,height:"4px",borderRadius:"2px",
+                        background:st==="pagada"?"#1D9E75":st==="actual"?"#EF9F27":"#e0e0dc"}}/>
+                  );
+                })}
               </div>
+              <div style={{fontSize:"11px",color:"#999",marginTop:"3px"}}>{pagadas}/{item.cuotas} cuotas abonadas</div>
             </div>
           );
         })}
@@ -192,70 +414,253 @@ function TarjetaView({totalUSD,saldo}){
   );
 }
 
+// ─── App ───────────────────────────────────────────────────────────────────
 function App(){
-  const [gastos,setGastos]=useState(GASTOS_INIT);
+  const [gastos,setGastos]=useState(()=>{
+    try{const s=localStorage.getItem("obras_gastos");return s?JSON.parse(s):GASTOS_INIT;}
+    catch(e){return GASTOS_INIT;}
+  });
+  const [dolar,setDolar]=useState(()=>parseInt(localStorage.getItem("obras_dolar")||"1395"));
   const [tab,setTab]=useState("dashboard");
-  const [form,setForm]=useState({fecha:"",cat:"Mano de Obra",detalle:"",resp:"",ars:"",usd:""});
   const [filterCat,setFilterCat]=useState("todas");
+  const [filterResp,setFilterResp]=useState("");
+  const [globalSearch,setGlobalSearch]=useState("");
+  const [sortField,setSortField]=useState("fecha");
+  const [sortAsc,setSortAsc]=useState(true);
+  const [modalNuevo,setModalNuevo]=useState(false);
+  const [editingGasto,setEditingGasto]=useState(null);
+  const [confirmDelete,setConfirmDelete]=useState(null);
+  const [showSearch,setShowSearch]=useState(false);
+  const fileRef=useRef();
 
+  // GitHub sync state
+  const [ghConfig,setGhConfig]=useState(()=>{
+    try{return JSON.parse(localStorage.getItem("obras_ghconfig"))||EMPTY_CONFIG;}
+    catch(e){return EMPTY_CONFIG;}
+  });
+  const [ghSha,setGhSha]=useState(()=>localStorage.getItem("obras_ghsha")||null);
+  const [syncStatus,setSyncStatus]=useState("idle"); // idle|loading|saving|success|error|unconfigured
+  const [syncMsg,setSyncMsg]=useState("");
+  const [pendingChanges,setPendingChanges]=useState(false);
+  const firstRender=useRef(true);
+
+  // Al montar: cargar desde GitHub si está configurado
+  useEffect(()=>{
+    if(!ghConfig.owner||!ghConfig.token){setSyncStatus("unconfigured");return;}
+    setSyncStatus("loading");setSyncMsg("");
+    ghGet(ghConfig)
+      .then(({gastos:g,sha})=>{
+        setGastos(g);
+        setGhSha(sha);
+        localStorage.setItem("obras_ghsha",sha);
+        localStorage.setItem("obras_gastos",JSON.stringify(g));
+        setSyncStatus("success");
+        setSyncMsg(new Date().toLocaleTimeString("es-AR"));
+      })
+      .catch(err=>{setSyncStatus("error");setSyncMsg(err.message);});
+  },[]);
+
+  // Guardar en localStorage y marcar pendiente cada vez que cambian gastos
+  useEffect(()=>{
+    if(firstRender.current){firstRender.current=false;return;}
+    localStorage.setItem("obras_gastos",JSON.stringify(gastos));
+    if(ghConfig.owner&&ghConfig.token) setPendingChanges(true);
+  },[gastos]);
+
+  useEffect(()=>{localStorage.setItem("obras_dolar",String(dolar));},[dolar]);
+
+  async function syncToGitHub(){
+    if(!ghConfig.owner||!ghConfig.token){setSyncStatus("unconfigured");setTab("config");return;}
+    setSyncStatus("saving");setSyncMsg("");
+    try{
+      const sha=await ghPut(ghConfig,gastos,ghSha);
+      setGhSha(sha);
+      localStorage.setItem("obras_ghsha",sha);
+      setPendingChanges(false);
+      setSyncStatus("success");
+      setSyncMsg(new Date().toLocaleTimeString("es-AR"));
+    }catch(err){setSyncStatus("error");setSyncMsg(err.message);}
+  }
+
+  async function handleSaveConfig(cfg){
+    const trimmed={...cfg,owner:cfg.owner.trim(),repo:cfg.repo.trim(),branch:cfg.branch.trim()||"main",path:cfg.path.trim()||"data.json"};
+    setGhConfig(trimmed);
+    localStorage.setItem("obras_ghconfig",JSON.stringify(trimmed));
+    if(!trimmed.owner||!trimmed.token){setSyncStatus("unconfigured");return;}
+    setSyncStatus("loading");setSyncMsg("");
+    try{
+      const{gastos:g,sha}=await ghGet(trimmed);
+      setGastos(g);setGhSha(sha);
+      localStorage.setItem("obras_ghsha",sha);
+      localStorage.setItem("obras_gastos",JSON.stringify(g));
+      setPendingChanges(false);
+      setSyncStatus("success");setSyncMsg(new Date().toLocaleTimeString("es-AR"));
+      setTab("dashboard");
+    }catch(err){
+      // Si no existe el archivo (404), crearlo con los datos actuales
+      if(err.message.includes("404")){
+        try{
+          const sha=await ghPut(trimmed,gastos,null);
+          setGhSha(sha);localStorage.setItem("obras_ghsha",sha);
+          setPendingChanges(false);setSyncStatus("success");setSyncMsg(new Date().toLocaleTimeString("es-AR"));
+          setTab("dashboard");
+        }catch(e2){setSyncStatus("error");setSyncMsg(e2.message);}
+      }else{setSyncStatus("error");setSyncMsg(err.message);}
+    }
+  }
+
+  // Totales
   const totalUSD=useMemo(()=>gastos.reduce((s,g)=>s+g.usd,0),[gastos]);
   const totalARS=useMemo(()=>gastos.reduce((s,g)=>s+g.ars,0),[gastos]);
   const saldo=PRESUPUESTO_USD-totalUSD;
   const pctGastado=pct(totalUSD,PRESUPUESTO_USD);
-  const moUSD=gastos.filter(g=>g.cat==="Mano de Obra").reduce((s,g)=>s+g.usd,0);
-  const matUSD=gastos.filter(g=>g.cat==="Materiales").reduce((s,g)=>s+g.usd,0);
-  const otUSD=gastos.filter(g=>g.cat==="Otros").reduce((s,g)=>s+g.usd,0);
-
+  const moUSD =useMemo(()=>gastos.filter(g=>g.cat==="Mano de Obra").reduce((s,g)=>s+g.usd,0),[gastos]);
+  const matUSD=useMemo(()=>gastos.filter(g=>g.cat==="Materiales").reduce((s,g)=>s+g.usd,0),[gastos]);
+  const otUSD =useMemo(()=>gastos.filter(g=>g.cat==="Otros").reduce((s,g)=>s+g.usd,0),[gastos]);
   const porResp=useMemo(()=>{
-    const m={};
-    gastos.forEach(g=>{m[g.resp]=(m[g.resp]||0)+g.usd;});
+    const m={};gastos.forEach(g=>{m[g.resp]=(m[g.resp]||0)+g.usd;});
     return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8);
   },[gastos]);
 
   const gastosFiltrados=useMemo(()=>{
-    let arr=filterCat==="todas"?[...gastos]:[...gastos].filter(g=>g.cat===filterCat);
-    return arr.sort((a,b)=>a.fecha.localeCompare(b.fecha));
-  },[gastos,filterCat]);
+    const q=globalSearch.toLowerCase();
+    return gastos.filter(g=>{
+      if(filterCat!=="todas"&&g.cat!==filterCat)return false;
+      if(filterResp&&!g.resp.toLowerCase().includes(filterResp.toLowerCase()))return false;
+      if(q&&![g.detalle,g.resp,g.cat,g.fecha].some(v=>v.toLowerCase().includes(q)))return false;
+      return true;
+    }).sort((a,b)=>{
+      let va=a[sortField],vb=b[sortField];
+      if(typeof va==="string"){va=va.toLowerCase();vb=vb.toLowerCase();}
+      return sortAsc?(va>vb?1:-1):(va<vb?1:-1);
+    });
+  },[gastos,filterCat,filterResp,globalSearch,sortField,sortAsc]);
 
-  function agregarGasto(){
-    if(!form.fecha||!form.detalle||!form.usd)return;
-    setGastos(p=>[...p,{id:Date.now(),fecha:form.fecha,cat:form.cat,detalle:form.detalle,resp:form.resp,ars:parseFloat(form.ars)||0,usd:parseFloat(form.usd)||0}]);
-    setForm({fecha:"",cat:"Mano de Obra",detalle:"",resp:"",ars:"",usd:""});
+  function agregarGasto(data){setGastos(p=>[...p,{id:Date.now(),...data}]);setModalNuevo(false);}
+  function guardarEdicion(data){setGastos(p=>p.map(g=>g.id===editingGasto.id?{...g,...data}:g));setEditingGasto(null);}
+  function eliminarGasto(id){setGastos(p=>p.filter(g=>g.id!==id));setConfirmDelete(null);}
+  function resetData(){if(window.confirm("¿Restablecer datos al estado inicial? Se perderán los cambios locales."))setGastos(GASTOS_INIT);}
+  function toggleSort(field){if(sortField===field)setSortAsc(a=>!a);else{setSortField(field);setSortAsc(true);}}
+  function handleImport(e){
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{try{const g=parseCSV(ev.target.result);if(g.length>0){setGastos(g);alert(`${g.length} registros importados.`);}}catch{alert("Error al leer el CSV.");}};
+    reader.readAsText(file,"UTF-8");e.target.value="";
   }
 
-  const tabs=[{k:"dashboard",l:"Dashboard"},{k:"cargar",l:"Cargar pago"},{k:"gastos",l:"Pagos"},{k:"presupuesto",l:"Presupuesto"},{k:"tarjeta",l:"Tarjeta"},{k:"proveedores",l:"Proveedores"}];
-
-  const navBtn=(t)=>({
+  const tabs=[
+    {k:"dashboard",l:"Dashboard"},
+    {k:"gastos",l:"Pagos"},
+    {k:"presupuesto",l:"Presupuesto"},
+    {k:"tarjeta",l:"Tarjeta"},
+    {k:"proveedores",l:"Proveedores"},
+    {k:"config",l:"⚙"},
+  ];
+  const navBtn=t=>({
     padding:"6px 16px",borderRadius:"8px",fontSize:"14px",
     border:tab===t.k?"1.5px solid #333":"1px solid #d0d0cc",
     background:tab===t.k?"#f0f0ee":"#fff",
-    color:"#1a1a1a",cursor:"pointer"
+    color:t.k==="config"?"#666":"#1a1a1a",cursor:"pointer",
   });
 
+  const SortBtn=({field,label})=>(
+    <button onClick={()=>toggleSort(field)} style={{background:"none",border:"none",cursor:"pointer",fontSize:"12px",
+      color:"#666",fontWeight:sortField===field?600:400,display:"flex",alignItems:"center",gap:"3px",padding:"2px 4px"}}>
+      {label}{sortField===field&&<span style={{fontSize:"10px"}}>{sortAsc?"▲":"▼"}</span>}
+    </button>
+  );
+
+  const syncDotColor={
+    idle:"#bbb",loading:"#EF9F27",saving:"#EF9F27",
+    success:"#1D9E75",error:"#c0392b",unconfigured:"#bbb"
+  };
+  const syncLabel={
+    idle:"Sin sincronizar",loading:"Cargando...",saving:"Guardando...",
+    success:`Sincronizado · ${syncMsg}`,error:`Error: ${syncMsg}`,unconfigured:"Sin configurar"
+  };
+
+  const alertSaldo=saldo<PRESUPUESTO_USD*0.20;
+  const warnSaldo=!alertSaldo&&saldo<PRESUPUESTO_USD*0.30;
+
   return(
-    <div style={{maxWidth:"700px",margin:"0 auto",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",color:"#1a1a1a"}}>
-      <div style={{marginBottom:"1.5rem"}}>
-        <div style={{fontSize:"20px",fontWeight:500}}>Control de Obras</div>
-        <div style={{fontSize:"13px",color:"#666"}}>Dólar: $1.395 · Marzo 2026</div>
+    <div style={{maxWidth:"700px",margin:"0 auto"}}>
+
+      {/* Header */}
+      <div style={{marginBottom:"1rem"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"8px",marginBottom:"8px"}}>
+          <div>
+            <div style={{fontSize:"20px",fontWeight:500}}>Control de Obras</div>
+            <div style={{fontSize:"13px",color:"#666"}}>Dólar: {fmtARS(dolar)} · {gastos.length} pagos</div>
+          </div>
+          <div style={{display:"flex",gap:"6px",alignItems:"center",flexWrap:"wrap"}}>
+            <button onClick={()=>setShowSearch(s=>!s)} className="btn-ghost" style={{padding:"6px 10px",fontSize:"13px"}}>🔍</button>
+            <button onClick={()=>exportCSV(gastos)} className="btn-ghost" style={{padding:"6px 10px",fontSize:"13px"}}>↓ CSV</button>
+            <button onClick={()=>fileRef.current.click()} className="btn-ghost" style={{padding:"6px 10px",fontSize:"13px"}}>↑ CSV</button>
+            <button onClick={syncToGitHub} className="btn-ghost"
+              style={{padding:"6px 10px",fontSize:"13px",position:"relative",
+                borderColor:pendingChanges?"#EF9F27":"#d0d0cc",
+                color:syncStatus==="error"?"#c0392b":"#1a1a1a"}}>
+              ↕ GitHub{pendingChanges&&<span style={{position:"absolute",top:"4px",right:"4px",width:"6px",height:"6px",borderRadius:"50%",background:"#EF9F27"}}/>}
+            </button>
+            <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}} onChange={handleImport}/>
+          </div>
+        </div>
+        {/* Sync status */}
+        <div style={{display:"flex",alignItems:"center",gap:"6px",fontSize:"12px",color:"#888"}}>
+          <span className="sync-dot" style={{background:syncDotColor[syncStatus]}}/>
+          <span>{syncLabel[syncStatus]}</span>
+          {syncStatus==="unconfigured"&&(
+            <button onClick={()=>setTab("config")} style={{background:"none",border:"none",color:"#7F77DD",fontSize:"12px",cursor:"pointer",textDecoration:"underline"}}>
+              Configurar
+            </button>
+          )}
+        </div>
+        {showSearch&&(
+          <div className="search-bar" style={{marginTop:"8px"}}>
+            <span style={{color:"#999",fontSize:"14px"}}>🔍</span>
+            <input autoFocus value={globalSearch} onChange={e=>setGlobalSearch(e.target.value)}
+              placeholder="Buscar en todos los pagos..." style={{flex:1}}/>
+            {globalSearch&&<button className="btn-icon" onClick={()=>setGlobalSearch("")} style={{fontSize:"16px"}}>×</button>}
+          </div>
+        )}
+        {globalSearch&&(
+          <div style={{fontSize:"13px",color:"#7F77DD",marginTop:"4px"}}>
+            {gastosFiltrados.length} resultado{gastosFiltrados.length!==1?"s":""} para "{globalSearch}"
+            <button onClick={()=>setTab("gastos")} style={{marginLeft:"8px",background:"none",border:"none",color:"#7F77DD",textDecoration:"underline",fontSize:"13px",cursor:"pointer"}}>Ver en Pagos</button>
+          </div>
+        )}
       </div>
+
+      {/* Alertas */}
+      {alertSaldo&&<div className="alert alert-danger"><span>⚠️</span><span>Saldo crítico: quedan <strong>{fmtUSD(saldo)}</strong> ({pct(saldo,PRESUPUESTO_USD)}% del presupuesto).</span></div>}
+      {warnSaldo&&<div className="alert alert-warn"><span>⚠️</span><span>Saldo bajo: quedan <strong>{fmtUSD(saldo)}</strong> ({pct(saldo,PRESUPUESTO_USD)}% del presupuesto).</span></div>}
+      {syncStatus==="loading"&&<div className="alert alert-info"><span>⟳</span><span>Cargando datos desde GitHub...</span></div>}
+
+      {/* Nav */}
       <div style={{display:"flex",gap:"8px",marginBottom:"1.5rem",flexWrap:"wrap"}}>
         {tabs.map(t=><button key={t.k} onClick={()=>setTab(t.k)} style={navBtn(t)}>{t.l}</button>)}
       </div>
 
+      {/* ── DASHBOARD ── */}
       {tab==="dashboard"&&(
         <div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px",marginBottom:"1.5rem"}}>
             {[
-              {l:"Presupuesto",v:fmtUSD(PRESUPUESTO_USD)},
-              {l:"Pagado",v:fmtUSD(totalUSD)},
-              {l:"Saldo disponible",v:fmtUSD(saldo),warn:saldo<1000},
+              {l:"Presupuesto",      v:fmtUSD(PRESUPUESTO_USD)},
+              {l:"Pagado",           v:fmtUSD(totalUSD)},
+              {l:"Saldo disponible", v:fmtUSD(saldo),warn:alertSaldo,soft:warnSaldo},
               {l:"Pagos registrados",v:gastos.length},
             ].map(m=>(
               <div key={m.l} className="metric">
                 <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>{m.l}</div>
-                <div style={{fontSize:"20px",fontWeight:500,color:m.warn?"#c0392b":"#1a1a1a"}}>{m.v}</div>
+                <div style={{fontSize:"20px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{m.v}</div>
               </div>
             ))}
+          </div>
+          <div className="card" style={{marginBottom:"1.5rem",display:"flex",alignItems:"center",gap:"16px",flexWrap:"wrap"}}>
+            <span style={{fontSize:"13px",color:"#666",flexShrink:0}}>Tipo de cambio USD:</span>
+            <input type="number" value={dolar} onChange={e=>setDolar(Number(e.target.value))} style={{width:"110px"}}/>
+            <span style={{fontSize:"13px",color:"#666"}}>· Total ARS al tipo actual: <strong>{fmtUSD(totalARS/dolar)}</strong></span>
           </div>
           <div className="card" style={{marginBottom:"1.5rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px",color:"#666",marginBottom:"8px"}}>
@@ -263,7 +668,8 @@ function App(){
               <span style={{fontWeight:500,color:"#1a1a1a"}}>{pctGastado}%</span>
             </div>
             <div style={{height:"12px",background:"#f0f0ee",borderRadius:"6px",overflow:"hidden"}}>
-              <div style={{height:"100%",width:pctGastado+"%",background:pctGastado>90?"#c0392b":pctGastado>75?"#EF9F27":"#1D9E75",borderRadius:"6px"}}/>
+              <div style={{height:"100%",width:pctGastado+"%",
+                background:pctGastado>90?"#c0392b":pctGastado>70?"#EF9F27":"#1D9E75",borderRadius:"6px"}}/>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",color:"#666",marginTop:"6px"}}>
               <span>{fmtUSD(totalUSD)} pagado</span><span>{fmtUSD(saldo)} disponible</span>
@@ -271,20 +677,29 @@ function App(){
           </div>
           <div className="card" style={{marginBottom:"1.5rem"}}>
             <div style={{fontSize:"14px",fontWeight:500,marginBottom:"1rem"}}>Desglose por categoría</div>
-            {[["Mano de Obra",moUSD],["Materiales",matUSD],["Otros",otUSD]].map(([cat,val])=>(
-              <div key={cat} style={{marginBottom:"12px"}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"4px"}}>
-                  <span style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                    <span style={{width:"8px",height:"8px",borderRadius:"50%",background:CAT_COLORS[cat],display:"inline-block"}}/>
-                    {cat}
-                  </span>
-                  <span style={{color:"#666"}}>{fmtUSD(val)} · {pct(val,totalUSD)}%</span>
-                </div>
-                <div style={{height:"8px",background:"#f0f0ee",borderRadius:"4px",overflow:"hidden"}}>
-                  <div style={{height:"100%",width:pct(val,totalUSD)+"%",background:CAT_COLORS[cat],borderRadius:"4px"}}/>
-                </div>
+            <div style={{display:"flex",gap:"1.5rem",alignItems:"center",flexWrap:"wrap"}}>
+              <DonutChart size={130} segments={[
+                {value:moUSD, color:CAT_COLORS["Mano de Obra"],label:"Mano de Obra"},
+                {value:matUSD,color:CAT_COLORS["Materiales"],  label:"Materiales"},
+                {value:otUSD, color:CAT_COLORS["Otros"],       label:"Otros"},
+              ]}/>
+              <div style={{flex:1,minWidth:"160px"}}>
+                {[["Mano de Obra",moUSD],["Materiales",matUSD],["Otros",otUSD]].map(([cat,val])=>(
+                  <div key={cat} style={{marginBottom:"12px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px",marginBottom:"4px"}}>
+                      <span style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                        <span style={{width:"8px",height:"8px",borderRadius:"50%",background:CAT_COLORS[cat],display:"inline-block"}}/>
+                        {cat}
+                      </span>
+                      <span style={{color:"#666"}}>{fmtUSD(val)} · {pct(val,totalUSD)}%</span>
+                    </div>
+                    <div style={{height:"8px",background:"#f0f0ee",borderRadius:"4px",overflow:"hidden"}}>
+                      <div style={{height:"100%",width:pct(val,totalUSD)+"%",background:CAT_COLORS[cat],borderRadius:"4px"}}/>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
             <div style={{borderTop:"0.5px solid #e0e0dc",marginTop:"12px",paddingTop:"10px",display:"flex",justifyContent:"space-between",fontSize:"13px"}}>
               <span style={{color:"#666"}}>Total pagado en ARS</span>
               <span style={{fontWeight:500}}>{fmtARS(totalARS)}</span>
@@ -293,7 +708,8 @@ function App(){
           <div className="card">
             <div style={{fontSize:"14px",fontWeight:500,marginBottom:"1rem"}}>Top proveedores</div>
             {porResp.map(([resp,val],i)=>(
-              <div key={resp} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:i<porResp.length-1?"0.5px solid #e0e0dc":"none",fontSize:"13px"}}>
+              <div key={resp} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",
+                borderBottom:i<porResp.length-1?"0.5px solid #e0e0dc":"none",fontSize:"13px"}}>
                 <span>{resp}</span><span style={{fontWeight:500,color:"#666"}}>{fmtUSD(val)}</span>
               </div>
             ))}
@@ -301,90 +717,102 @@ function App(){
         </div>
       )}
 
-      {tab==="cargar"&&(
-        <div className="card">
-          <div style={{fontSize:"15px",fontWeight:500,marginBottom:"1.25rem"}}>Nuevo pago</div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
-            <div>
-              <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>Fecha</div>
-              <input type="date" value={form.fecha} onChange={e=>setForm(p=>({...p,fecha:e.target.value}))}/>
-            </div>
-            <div>
-              <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>Categoría</div>
-              <select value={form.cat} onChange={e=>setForm(p=>({...p,cat:e.target.value}))}>
-                {CATS.map(c=><option key={c}>{c}</option>)}
-              </select>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>Detalle</div>
-              <input type="text" value={form.detalle} placeholder="Ej: Pago4 Eric" onChange={e=>setForm(p=>({...p,detalle:e.target.value}))}/>
-            </div>
-            <div style={{gridColumn:"1/-1"}}>
-              <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>Responsable / Proveedor</div>
-              <input type="text" value={form.resp} placeholder="Ej: Eric" onChange={e=>setForm(p=>({...p,resp:e.target.value}))}/>
-            </div>
-            <div>
-              <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>Monto ARS</div>
-              <input type="number" value={form.ars} placeholder="0" onChange={e=>setForm(p=>({...p,ars:e.target.value}))}/>
-            </div>
-            <div>
-              <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>Equivalente USD</div>
-              <input type="number" value={form.usd} placeholder="0" onChange={e=>setForm(p=>({...p,usd:e.target.value}))}/>
-            </div>
-          </div>
-          <button onClick={agregarGasto} style={{marginTop:"1.25rem",padding:"8px 24px",borderRadius:"8px",border:"1px solid #d0d0cc",background:"#f5f5f3",color:"#1a1a1a",fontSize:"14px"}}>
-            Agregar pago
-          </button>
-        </div>
-      )}
-
+      {/* ── GASTOS ── */}
       {tab==="gastos"&&(
         <div>
-          <div style={{display:"flex",gap:"8px",alignItems:"center",marginBottom:"1rem",flexWrap:"wrap"}}>
-            <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{width:"auto"}}>
+          <div className="card" style={{marginBottom:"1rem",display:"flex",gap:"10px",flexWrap:"wrap",alignItems:"center"}}>
+            <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{width:"auto",flex:"1 1 140px"}}>
               <option value="todas">Todas las categorías</option>
               {CATS.map(c=><option key={c}>{c}</option>)}
             </select>
-            <span style={{fontSize:"13px",color:"#666"}}>{gastosFiltrados.length} registros · {fmtUSD(gastosFiltrados.reduce((s,g)=>s+g.usd,0))}</span>
+            <input type="text" value={filterResp} onChange={e=>setFilterResp(e.target.value)}
+              placeholder="Filtrar por responsable..." style={{flex:"1 1 160px"}}/>
+            <button onClick={()=>{setFilterCat("todas");setFilterResp("");setGlobalSearch("");}}
+              style={{background:"none",border:"1px solid #e0e0dc",borderRadius:"8px",padding:"6px 10px",fontSize:"12px",color:"#666"}}>
+              Limpiar
+            </button>
           </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px",fontSize:"13px",color:"#666",padding:"0 4px"}}>
+            <span>{gastosFiltrados.length} registros · {fmtUSD(gastosFiltrados.reduce((s,g)=>s+g.usd,0))}</span>
+            <div style={{display:"flex",gap:"4px",alignItems:"center"}}>
+              <span style={{fontSize:"12px",color:"#999"}}>Ordenar:</span>
+              <SortBtn field="fecha" label="Fecha"/>
+              <SortBtn field="usd" label="USD"/>
+              <SortBtn field="cat" label="Cat"/>
+            </div>
+          </div>
+          <button onClick={()=>setModalNuevo(true)} className="btn-primary"
+            style={{marginBottom:"1rem",width:"100%",padding:"10px"}}>
+            + Agregar pago
+          </button>
           <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
             {gastosFiltrados.map(g=>(
-              <div key={g.id} className="card" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px",padding:"0.75rem 1rem"}}>
-                <div style={{display:"flex",alignItems:"center",gap:"10px",flex:1,minWidth:0}}>
-                  <div style={{width:"8px",height:"8px",borderRadius:"50%",background:CAT_COLORS[g.cat]||"#888",flexShrink:0}}/>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontSize:"14px",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.detalle}</div>
-                    <div style={{fontSize:"12px",color:"#666"}}>{g.cat} · {g.resp} · {g.fecha}</div>
+              <div key={g.id} className="card" style={{display:"flex",alignItems:"center",gap:"10px",padding:"0.75rem 1rem"}}>
+                <div style={{width:"8px",height:"8px",borderRadius:"50%",background:CAT_COLORS[g.cat]||"#888",flexShrink:0}}/>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:"14px",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{g.detalle}</div>
+                  <div style={{fontSize:"12px",color:"#666",marginTop:"2px",display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"}}>
+                    <span className="tag">{g.cat}</span>
+                    <span>{g.resp}</span>
+                    <span style={{color:"#bbb"}}>·</span>
+                    <span>{g.fecha}</span>
                   </div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
                   <div style={{fontSize:"14px",fontWeight:500}}>{fmtUSD(g.usd)}</div>
-                  <div style={{fontSize:"12px",color:"#666"}}>{fmtARS(g.ars)}</div>
+                  <div style={{fontSize:"12px",color:"#999"}}>{fmtARS(g.ars)}</div>
                 </div>
-                <button onClick={()=>setGastos(p=>p.filter(x=>x.id!==g.id))} style={{background:"none",border:"none",color:"#999",fontSize:"18px",padding:"0 4px",lineHeight:1}}>×</button>
+                <div style={{display:"flex",flexDirection:"column",gap:"2px",flexShrink:0}}>
+                  <button className="btn-icon" title="Editar" onClick={()=>setEditingGasto(g)}>✏️</button>
+                  <button className="btn-icon" title="Eliminar" onClick={()=>setConfirmDelete(g.id)}>🗑️</button>
+                </div>
               </div>
             ))}
+            {gastosFiltrados.length===0&&(
+              <div style={{textAlign:"center",color:"#999",fontSize:"14px",padding:"2rem"}}>
+                No hay registros que coincidan.
+              </div>
+            )}
           </div>
         </div>
       )}
 
+      {/* ── PRESUPUESTO ── */}
       {tab==="presupuesto"&&(
         <div>
           {["Trabajo Casa","Material Estimado","Falta Cotizar"].map(tipo=>{
             const items=PRESUPUESTO_ITEMS.filter(i=>i.tipo===tipo);
             const totalTipo=items.reduce((s,i)=>s+i.usd,0);
+            const catMap={"Trabajo Casa":"Mano de Obra","Material Estimado":"Materiales","Falta Cotizar":"Otros"};
+            const cat=catMap[tipo];
+            const gastadoCat=cat==="Mano de Obra"?moUSD:cat==="Materiales"?matUSD:otUSD;
+            const pctCat=pct(gastadoCat,totalTipo);
             return(
               <div key={tipo} className="card" style={{marginBottom:"1rem"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
                   <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
                     <span style={{width:"8px",height:"8px",borderRadius:"50%",background:TIPO_COLORS[tipo],display:"inline-block"}}/>
                     <span style={{fontSize:"14px",fontWeight:500}}>{tipo}</span>
                   </div>
                   <span style={{fontSize:"13px",fontWeight:500,color:"#666"}}>{fmtUSD(totalTipo)}</span>
                 </div>
+                <div style={{marginBottom:"12px",background:"#f5f5f3",borderRadius:"8px",padding:"8px 10px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",color:"#666",marginBottom:"4px"}}>
+                    <span>Pagado: <strong style={{color:"#1a1a1a"}}>{fmtUSD(gastadoCat)}</strong></span>
+                    <span style={{color:pctCat>100?"#c0392b":pctCat>80?"#8a5c00":"#666"}}>{pctCat}% del presupuesto</span>
+                  </div>
+                  <div style={{height:"6px",background:"#e0e0dc",borderRadius:"3px",overflow:"hidden"}}>
+                    <div style={{height:"100%",width:Math.min(pctCat,100)+"%",
+                      background:pctCat>100?"#c0392b":pctCat>80?"#EF9F27":TIPO_COLORS[tipo],borderRadius:"3px"}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"#999",marginTop:"3px"}}>
+                    <span>Resto: {fmtUSD(Math.max(totalTipo-gastadoCat,0))}</span>
+                    {pctCat>100&&<span style={{color:"#c0392b"}}>Excedido en {fmtUSD(gastadoCat-totalTipo)}</span>}
+                  </div>
+                </div>
                 {items.map((item,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:"13px",padding:"5px 0",borderTop:"0.5px solid #e0e0dc"}}>
-                    <span style={{color:"#666",flex:1,paddingRight:"12px"}}>{item.detalle}</span>
+                    <span style={{color:"#555",flex:1,paddingRight:"12px"}}>{item.detalle}</span>
                     <span style={{fontWeight:500}}>{fmtUSD(item.usd)}</span>
                   </div>
                 ))}
@@ -395,12 +823,12 @@ function App(){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"12px",textAlign:"center"}}>
               {[
                 {l:"Presupuestado",v:fmtUSD(PRESUPUESTO_USD)},
-                {l:"Pagado",v:fmtUSD(totalUSD)},
-                {l:"Saldo",v:fmtUSD(saldo),warn:saldo<1000},
+                {l:"Pagado",       v:fmtUSD(totalUSD)},
+                {l:"Saldo",        v:fmtUSD(saldo),warn:alertSaldo,soft:warnSaldo},
               ].map(m=>(
                 <div key={m.l}>
                   <div style={{fontSize:"12px",color:"#666",marginBottom:"4px"}}>{m.l}</div>
-                  <div style={{fontSize:"16px",fontWeight:500,color:m.warn?"#c0392b":"#1a1a1a"}}>{m.v}</div>
+                  <div style={{fontSize:"16px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{m.v}</div>
                 </div>
               ))}
             </div>
@@ -408,8 +836,10 @@ function App(){
         </div>
       )}
 
-      {tab==="tarjeta"&&<TarjetaView totalUSD={totalUSD} saldo={saldo}/>}
+      {/* ── TARJETA ── */}
+      {tab==="tarjeta"&&<TarjetaView dolar={dolar}/>}
 
+      {/* ── PROVEEDORES ── */}
       {tab==="proveedores"&&(
         <div style={{display:"flex",flexDirection:"column",gap:"8px"}}>
           {porResp.map(([resp,val])=>{
@@ -417,24 +847,135 @@ function App(){
             const cats=[...new Set(regs.map(g=>g.cat))];
             return(
               <div key={resp} className="card" style={{padding:"0.75rem 1rem"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
                   <div style={{fontSize:"14px",fontWeight:500}}>{resp}</div>
-                  <div style={{fontSize:"14px",fontWeight:500}}>{fmtUSD(val)}</div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:"14px",fontWeight:500}}>{fmtUSD(val)}</div>
+                    <div style={{fontSize:"12px",color:"#999"}}>{fmtARS(regs.reduce((s,g)=>s+g.ars,0))}</div>
+                  </div>
                 </div>
                 <div style={{display:"flex",gap:"6px",flexWrap:"wrap",alignItems:"center"}}>
                   <span style={{fontSize:"12px",color:"#666"}}>{regs.length} pago{regs.length!==1?"s":""}</span>
-                  {cats.map(c=>(
-                    <span key={c} style={{fontSize:"11px",padding:"2px 8px",borderRadius:"8px",background:"#f0f0ee",color:"#666"}}>{c}</span>
-                  ))}
+                  {cats.map(c=><span key={c} className="tag">{c}</span>)}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      {/* ── CONFIGURACIÓN ── */}
+      {tab==="config"&&(
+        <ConfigTab
+          config={ghConfig}
+          syncStatus={syncStatus}
+          syncMsg={syncMsg}
+          onSave={handleSaveConfig}
+          onReset={resetData}
+        />
+      )}
+
+      {/* Modales */}
+      {modalNuevo&&<GastoModal gasto={null} dolar={dolar} onSave={agregarGasto} onClose={()=>setModalNuevo(false)} title="Nuevo pago"/>}
+      {editingGasto&&(
+        <GastoModal
+          gasto={{fecha:editingGasto.fecha,cat:editingGasto.cat,detalle:editingGasto.detalle,resp:editingGasto.resp,ars:String(editingGasto.ars),usd:String(editingGasto.usd)}}
+          dolar={dolar} onSave={guardarEdicion} onClose={()=>setEditingGasto(null)} title="Editar pago"
+        />
+      )}
+      {confirmDelete!==null&&(
+        <ConfirmModal
+          mensaje={`¿Eliminar "${gastos.find(g=>g.id===confirmDelete)?.detalle}"?`}
+          onConfirm={()=>eliminarGasto(confirmDelete)}
+          onClose={()=>setConfirmDelete(null)}
+        />
+      )}
     </div>
   );
 }
+
+// ─── Tab Configuración ────────────────────────────────────────────────────
+function ConfigTab({config,syncStatus,syncMsg,onSave,onReset}){
+  const [form,setForm]=useState({...config});
+  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
+  const isSaving=syncStatus==="loading"||syncStatus==="saving";
+
+  return(
+    <div>
+      <div className="card" style={{marginBottom:"1rem"}}>
+        <div style={{fontSize:"15px",fontWeight:500,marginBottom:"4px"}}>Sincronización con GitHub</div>
+        <div style={{fontSize:"13px",color:"#666",marginBottom:"1.25rem",lineHeight:"1.6"}}>
+          Los datos se guardan en un archivo <code>data.json</code> en tu repositorio.
+          El token se guarda únicamente en este navegador.
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"12px"}}>
+            <div>
+              <div className="field-label">Usuario / Organización</div>
+              <input type="text" value={form.owner} placeholder="tunombre" onChange={e=>set("owner",e.target.value)}/>
+            </div>
+            <div>
+              <div className="field-label">Repositorio</div>
+              <input type="text" value={form.repo} placeholder="obra-gastos" onChange={e=>set("repo",e.target.value)}/>
+            </div>
+            <div>
+              <div className="field-label">Branch</div>
+              <input type="text" value={form.branch} placeholder="main" onChange={e=>set("branch",e.target.value)}/>
+            </div>
+            <div>
+              <div className="field-label">Archivo de datos</div>
+              <input type="text" value={form.path} placeholder="data.json" onChange={e=>set("path",e.target.value)}/>
+            </div>
+          </div>
+          <div>
+            <div className="field-label">Personal Access Token (PAT)</div>
+            <input type="password" value={form.token} placeholder="ghp_xxxxxxxxxxxx" onChange={e=>set("token",e.target.value)}/>
+            <div style={{fontSize:"11px",color:"#999",marginTop:"4px"}}>
+              Solo se guarda en localStorage de este navegador. Nunca se sube al repositorio.
+            </div>
+          </div>
+        </div>
+        <div style={{display:"flex",gap:"8px",marginTop:"1.25rem",alignItems:"center",flexWrap:"wrap"}}>
+          <button className="btn-primary" onClick={()=>onSave(form)} disabled={isSaving}
+            style={{opacity:isSaving?0.6:1}}>
+            {isSaving?"Conectando...":"Guardar y conectar"}
+          </button>
+          {syncStatus==="success"&&<span style={{fontSize:"13px",color:"#1D9E75"}}>✓ Conectado · {syncMsg}</span>}
+          {syncStatus==="error"&&<span style={{fontSize:"13px",color:"#c0392b"}}>✗ {syncMsg}</span>}
+        </div>
+      </div>
+
+      {/* Instrucciones */}
+      <div className="card" style={{marginBottom:"1rem"}}>
+        <div style={{fontSize:"14px",fontWeight:500,marginBottom:"12px"}}>Cómo configurar</div>
+        {[
+          ["1. Crear el repositorio","En GitHub, creá un repo (puede ser privado). Subí los archivos index.html y data.json."],
+          ["2. Activar GitHub Pages","Settings → Pages → Source: main branch → /root → Save."],
+          ["3. Crear el token","Settings → Developer settings → Personal access tokens → Fine-grained → New token → seleccioná el repo → Contents: Read and write → Generate."],
+          ["4. Configurar aquí","Pegá el token arriba y guardá. La app carga automáticamente el data.json del repo."],
+          ["5. Guardar cambios","Usá el botón ↕ GitHub del header para sincronizar los cambios al archivo. El punto naranja indica cambios pendientes."],
+        ].map(([titulo,desc])=>(
+          <div key={titulo} style={{marginBottom:"10px",paddingBottom:"10px",borderBottom:"0.5px solid #f0f0ee"}}>
+            <div style={{fontSize:"13px",fontWeight:500,marginBottom:"2px"}}>{titulo}</div>
+            <div style={{fontSize:"13px",color:"#666"}}>{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Reset */}
+      <div className="card">
+        <div style={{fontSize:"14px",fontWeight:500,marginBottom:"8px"}}>Datos locales</div>
+        <div style={{fontSize:"13px",color:"#666",marginBottom:"12px"}}>
+          Restablecer todos los pagos al estado inicial del código. Útil para empezar desde cero.
+        </div>
+        <button className="btn-ghost" onClick={onReset} style={{borderColor:"#f5a0a0",color:"#c0392b"}}>
+          Restablecer datos iniciales
+        </button>
+      </div>
+    </div>
+  );
+}
+
 ReactDOM.render(<App/>,document.getElementById("root"));
 </script>
 </body>
