@@ -250,5 +250,14 @@
     "resp": "Eric",
     "ars": 800000,
     "usd": 573.48
+  },
+  {
+    "id": 29,
+    "fecha": "2026-04-05",
+    "cat": "Materiales",
+    "detalle": "Pastina, pegamento azulejo y caja de electricidad",
+    "resp": "Liverpool Ferretería",
+    "ars": 13500,
+    "usd": 9.68
   }
 ]
