@@ -122,6 +122,7 @@ function addMonths(dateStr, n){
 }
 function fmtARS(n){return "$"+Math.round(n).toLocaleString("es-AR");}
 function fmtUSD(n){return "U$S "+n.toLocaleString("es-AR",{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtMoney(ars, usd){return {ars:fmtARS(ars), usd:fmtUSD(usd)};}
 function pct(a,b){return b===0?0:Math.round(a/b*100);}
 function cuotaStatus(y,m){
   const n=new Date(),ny=n.getFullYear(),nm=n.getMonth()+1;
@@ -653,8 +654,8 @@ function App(){
       </div>
 
       {/* Alertas */}
-      {alertSaldo&&<div className="alert alert-danger"><span>⚠️</span><span>Saldo crítico: quedan <strong>{fmtUSD(saldo)}</strong> ({pct(saldo,PRESUPUESTO_USD)}% del presupuesto).</span></div>}
-      {warnSaldo&&<div className="alert alert-warn"><span>⚠️</span><span>Saldo bajo: quedan <strong>{fmtUSD(saldo)}</strong> ({pct(saldo,PRESUPUESTO_USD)}% del presupuesto).</span></div>}
+      {alertSaldo&&<div className="alert alert-danger"><span>⚠️</span><span>Saldo crítico: quedan <strong>{fmtUSD(saldo)}</strong> · <strong>{fmtARS(saldo*dolar)}</strong> ({pct(saldo,PRESUPUESTO_USD)}% del presupuesto).</span></div>}
+      {warnSaldo&&<div className="alert alert-warn"><span>⚠️</span><span>Saldo bajo: quedan <strong>{fmtUSD(saldo)}</strong> · <strong>{fmtARS(saldo*dolar)}</strong> ({pct(saldo,PRESUPUESTO_USD)}% del presupuesto).</span></div>}
       {syncStatus==="loading"&&<div className="alert alert-info"><span>⟳</span><span>Cargando datos desde GitHub...</span></div>}
 
       {/* Nav */}
@@ -667,21 +668,28 @@ function App(){
         <div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"12px",marginBottom:"1.5rem"}}>
             {[
-              {l:"Presupuesto",      v:fmtUSD(PRESUPUESTO_USD)},
-              {l:"Pagado",           v:fmtUSD(totalUSD)},
-              {l:"Saldo disponible", v:fmtUSD(saldo),warn:alertSaldo,soft:warnSaldo},
-              {l:"Pagos registrados",v:gastos.length},
+              {l:"Presupuesto", ars:Math.round(PRESUPUESTO_USD*dolar), usd:PRESUPUESTO_USD},
+              {l:"Pagado", ars:totalARS, usd:totalUSD},
+              {l:"Saldo disponible", ars:saldo*dolar, usd:saldo, warn:alertSaldo, soft:warnSaldo},
+              {l:"Pagos registrados", v:gastos.length},
             ].map(m=>(
               <div key={m.l} className="metric">
                 <div style={{fontSize:"13px",color:"#666",marginBottom:"4px"}}>{m.l}</div>
-                <div style={{fontSize:"20px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{m.v}</div>
+                {typeof m.v!=="undefined" ? (
+                  <div style={{fontSize:"20px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{m.v}</div>
+                ) : (
+                  <>
+                    <div style={{fontSize:"18px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{fmtARS(m.ars)}</div>
+                    <div style={{fontSize:"12px",color:"#666",marginTop:"2px"}}>{fmtUSD(m.usd)}</div>
+                  </>
+                )}
               </div>
             ))}
           </div>
           <div className="card" style={{marginBottom:"1.5rem",display:"flex",alignItems:"center",gap:"16px",flexWrap:"wrap"}}>
             <span style={{fontSize:"13px",color:"#666",flexShrink:0}}>Tipo de cambio USD:</span>
             <input type="number" value={dolar} onChange={e=>setDolar(Number(e.target.value))} style={{width:"110px"}}/>
-            <span style={{fontSize:"13px",color:"#666"}}>· Total ARS al tipo actual: <strong>{fmtUSD(totalARS/dolar)}</strong></span>
+            <span style={{fontSize:"13px",color:"#666"}}>· Total cargado: <strong>{fmtARS(totalARS)}</strong> · <strong>{fmtUSD(totalUSD)}</strong></span>
           </div>
           <div className="card" style={{marginBottom:"1.5rem"}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:"13px",color:"#666",marginBottom:"8px"}}>
@@ -693,7 +701,7 @@ function App(){
                 background:pctGastado>90?"#c0392b":pctGastado>70?"#EF9F27":"#1D9E75",borderRadius:"6px"}}/>
             </div>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",color:"#666",marginTop:"6px"}}>
-              <span>{fmtUSD(totalUSD)} pagado</span><span>{fmtUSD(saldo)} disponible</span>
+              <span>{fmtARS(totalARS)} · {fmtUSD(totalUSD)} pagado</span><span>{fmtARS(saldo*dolar)} · {fmtUSD(saldo)} disponible</span>
             </div>
           </div>
           <div className="card" style={{marginBottom:"1.5rem"}}>
@@ -712,7 +720,7 @@ function App(){
                         <span style={{width:"8px",height:"8px",borderRadius:"50%",background:CAT_COLORS[cat],display:"inline-block"}}/>
                         {cat}
                       </span>
-                      <span style={{color:"#666"}}>{fmtUSD(val)} · {pct(val,totalUSD)}%</span>
+                      <span style={{color:"#666"}}>{fmtARS(val*dolar)} · {fmtUSD(val)} · {pct(val,totalUSD)}%</span>
                     </div>
                     <div style={{height:"8px",background:"#f0f0ee",borderRadius:"4px",overflow:"hidden"}}>
                       <div style={{height:"100%",width:pct(val,totalUSD)+"%",background:CAT_COLORS[cat],borderRadius:"4px"}}/>
@@ -731,7 +739,7 @@ function App(){
             {porResp.map(([resp,val],i)=>(
               <div key={resp} style={{display:"flex",justifyContent:"space-between",padding:"7px 0",
                 borderBottom:i<porResp.length-1?"0.5px solid #e0e0dc":"none",fontSize:"13px"}}>
-                <span>{resp}</span><span style={{fontWeight:500,color:"#666"}}>{fmtUSD(val)}</span>
+                <span>{resp}</span><span style={{fontWeight:500,color:"#666"}}>{fmtARS(val*dolar)} · {fmtUSD(val)}</span>
               </div>
             ))}
           </div>
@@ -754,7 +762,7 @@ function App(){
             </button>
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px",fontSize:"13px",color:"#666",padding:"0 4px"}}>
-            <span>{gastosFiltrados.length} registros · {fmtUSD(gastosFiltrados.reduce((s,g)=>s+g.usd,0))}</span>
+            <span>{gastosFiltrados.length} registros · {fmtARS(gastosFiltrados.reduce((s,g)=>s+g.ars,0))} · {fmtUSD(gastosFiltrados.reduce((s,g)=>s+g.usd,0))}</span>
             <div style={{display:"flex",gap:"4px",alignItems:"center"}}>
               <span style={{fontSize:"12px",color:"#999"}}>Ordenar:</span>
               <SortBtn field="fecha" label="Fecha"/>
@@ -815,11 +823,11 @@ function App(){
                     <span style={{width:"8px",height:"8px",borderRadius:"50%",background:TIPO_COLORS[tipo],display:"inline-block"}}/>
                     <span style={{fontSize:"14px",fontWeight:500}}>{tipo}</span>
                   </div>
-                  <span style={{fontSize:"13px",fontWeight:500,color:"#666"}}>{fmtUSD(totalTipo)}</span>
+                  <span style={{fontSize:"13px",fontWeight:500,color:"#666"}}>{fmtARS(totalTipo*dolar)} · {fmtUSD(totalTipo)}</span>
                 </div>
                 <div style={{marginBottom:"12px",background:"#f5f5f3",borderRadius:"8px",padding:"8px 10px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",color:"#666",marginBottom:"4px"}}>
-                    <span>Pagado: <strong style={{color:"#1a1a1a"}}>{fmtUSD(gastadoCat)}</strong></span>
+                    <span>Pagado: <strong style={{color:"#1a1a1a"}}>{fmtARS(gastadoCat*dolar)} · {fmtUSD(gastadoCat)}</strong></span>
                     <span style={{color:pctCat>100?"#c0392b":pctCat>80?"#8a5c00":"#666"}}>{pctCat}% del presupuesto</span>
                   </div>
                   <div style={{height:"6px",background:"#e0e0dc",borderRadius:"3px",overflow:"hidden"}}>
@@ -827,14 +835,14 @@ function App(){
                       background:pctCat>100?"#c0392b":pctCat>80?"#EF9F27":TIPO_COLORS[tipo],borderRadius:"3px"}}/>
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"#999",marginTop:"3px"}}>
-                    <span>Resto: {fmtUSD(Math.max(totalTipo-gastadoCat,0))}</span>
-                    {pctCat>100&&<span style={{color:"#c0392b"}}>Excedido en {fmtUSD(gastadoCat-totalTipo)}</span>}
+                    <span>Resto: {fmtARS(Math.max(totalTipo-gastadoCat,0)*dolar)} · {fmtUSD(Math.max(totalTipo-gastadoCat,0))}</span>
+                    {pctCat>100&&<span style={{color:"#c0392b"}}>Excedido en {fmtARS((gastadoCat-totalTipo)*dolar)} · {fmtUSD(gastadoCat-totalTipo)}</span>}
                   </div>
                 </div>
                 {items.map((item,i)=>(
                   <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:"13px",padding:"5px 0",borderTop:"0.5px solid #e0e0dc"}}>
                     <span style={{color:"#555",flex:1,paddingRight:"12px"}}>{item.detalle}</span>
-                    <span style={{fontWeight:500}}>{fmtUSD(item.usd)}</span>
+                    <span style={{fontWeight:500}}>{fmtARS(item.usd*dolar)} · {fmtUSD(item.usd)}</span>
                   </div>
                 ))}
               </div>
@@ -843,13 +851,14 @@ function App(){
           <div style={{background:"#f5f5f3",borderRadius:"12px",padding:"1rem 1.25rem"}}>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"12px",textAlign:"center"}}>
               {[
-                {l:"Presupuestado",v:fmtUSD(PRESUPUESTO_USD)},
-                {l:"Pagado",       v:fmtUSD(totalUSD)},
-                {l:"Saldo",        v:fmtUSD(saldo),warn:alertSaldo,soft:warnSaldo},
+                {l:"Presupuestado",ars:PRESUPUESTO_USD*dolar,usd:PRESUPUESTO_USD},
+                {l:"Pagado",       ars:totalARS,usd:totalUSD},
+                {l:"Saldo",        ars:saldo*dolar,usd:saldo,warn:alertSaldo,soft:warnSaldo},
               ].map(m=>(
                 <div key={m.l}>
                   <div style={{fontSize:"12px",color:"#666",marginBottom:"4px"}}>{m.l}</div>
-                  <div style={{fontSize:"16px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{m.v}</div>
+                  <div style={{fontSize:"16px",fontWeight:500,color:m.warn?"#c0392b":m.soft?"#8a5c00":"#1a1a1a"}}>{fmtARS(m.ars)}</div>
+                  <div style={{fontSize:"11px",color:"#666",marginTop:"2px"}}>{fmtUSD(m.usd)}</div>
                 </div>
               ))}
             </div>
