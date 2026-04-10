@@ -277,5 +277,16 @@
     "resp": "ACCESANIGA",
     "ars": 296000,
     "usd": 212.19
+  },
+  {
+    "id": 1775850669382,
+    "fecha": "2026-04-10",
+    "cat": "Mano de Obra",
+    "detalle": "Pago5",
+    "resp": "Eric",
+    "ars": 500000,
+    "usd": 358.42,
+    "medioPago": "Efectivo",
+    "cuotas": 1
   }
 ]
