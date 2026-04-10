@@ -49,7 +49,7 @@ const CAT_COLORS  = {"Mano de Obra":"#7F77DD","Materiales":"#1D9E75","Otros":"#E
 const TIPO_COLORS = {"Trabajo Casa":"#7F77DD","Material Estimado":"#1D9E75","Falta Cotizar":"#EF9F27"};
 const CATS   = ["Mano de Obra","Materiales","Otros"];
 const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
-const EMPTY_FORM   = {fecha:TODAY, cat:"Mano de Obra", detalle:"", resp:"", ars:"", usd:""};
+const EMPTY_FORM   = {fecha:TODAY, cat:"Mano de Obra", detalle:"", resp:"", ars:"", usd:"", medioPago:"Efectivo", cuotas:"1"};
 const EMPTY_CONFIG = {owner:"", repo:"", branch:"main", path:"data.json", token:""};
 
 const GASTOS_INIT = [
@@ -161,8 +161,8 @@ async function ghPut(cfg, gastos, sha){
 
 // ─── CSV Export / Import ───────────────────────────────────────────────────
 function exportCSV(gastos){
-  const headers=["id","fecha","cat","detalle","resp","ars","usd"];
-  const rows=gastos.map(g=>headers.map(h=>`"${String(g[h]).replace(/"/g,'""')}"`).join(","));
+  const headers=["id","fecha","cat","detalle","resp","ars","usd","medioPago","cuotas"];
+  const rows=gastos.map(g=>headers.map(h=>`"${String(g[h]??"").replace(/"/g,'""')}"`).join(","));
   const csv=[headers.join(","),...rows].join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
   const url=URL.createObjectURL(blob);
@@ -181,10 +181,10 @@ function parseCSV(text){
     headers.forEach((h,i)=>{
       let v=(vals[i]||"").replace(/^"|"$/g,"").replace(/""/g,'"').trim();
       if(h==="ars"||h==="usd") v=parseFloat(v)||0;
-      else if(h==="id") v=parseInt(v)||Date.now()+i;
+      else if(h==="id"||h==="cuotas") v=parseInt(v)||0;
       obj[h]=v;
     });
-    return obj;
+    return {...obj,id:obj.id||Date.now(),medioPago:obj.medioPago||"Efectivo",cuotas:(obj.medioPago||"Efectivo")==="Tarjeta"?(obj.cuotas||1):1};
   }).filter(g=>g.detalle);
 }
 
@@ -222,7 +222,7 @@ function GastoModal({gasto,dolar,onSave,onClose,title}){
   function handleUSD(v){set("usd",v);if(dolar&&parseFloat(v)>0)set("ars",Math.round(parseFloat(v)*dolar).toString());}
   function handleSave(){
     if(!form.fecha||!form.detalle||(form.ars===""&&form.usd===""))return;
-    onSave({...form,ars:parseFloat(form.ars)||0,usd:parseFloat(form.usd)||0});
+    onSave({...form,ars:parseFloat(form.ars)||0,usd:parseFloat(form.usd)||0,medioPago:form.medioPago||"Efectivo",cuotas:(form.medioPago||"Efectivo")==="Tarjeta"?(parseInt(form.cuotas)||1):1});
   }
   return(
     <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -248,6 +248,17 @@ function GastoModal({gasto,dolar,onSave,onClose,title}){
           <div><div className="field-label">Equivalente USD</div>
             <input type="number" value={form.usd} placeholder="0" onChange={e=>handleUSD(e.target.value)}/>
           </div>
+          <div><div className="field-label">Medio de pago</div>
+            <select value={form.medioPago||"Efectivo"} onChange={e=>set("medioPago",e.target.value)}>
+              <option value="Efectivo">Efectivo</option>
+              <option value="Tarjeta">Tarjeta</option>
+            </select>
+          </div>
+          {(form.medioPago||"Efectivo")==="Tarjeta"&&(
+            <div><div className="field-label">Cuotas</div>
+              <input type="number" min="1" max="24" value={form.cuotas||"1"} onChange={e=>set("cuotas",e.target.value)}/>
+            </div>
+          )}
         </div>
         <div style={{fontSize:"12px",color:"#999",marginTop:"8px"}}>
           Tipo de cambio activo: {fmtARS(dolar)} · Los montos se calculan entre sí.
@@ -277,10 +288,17 @@ function ConfirmModal({mensaje,onConfirm,onClose}){
 }
 
 // ─── Tab Tarjeta ──────────────────────────────────────────────────────────
-function TarjetaView({dolar}){
+function TarjetaView({dolar,gastos}){
+  const tarjetaItems=useMemo(()=>[
+    ...CUOTAS_RAW,
+    ...gastos.filter(g=>(g.medioPago||"Efectivo")==="Tarjeta").map(g=>{
+      const cuotas=Math.max(parseInt(g.cuotas)||1,1);
+      return {fecha:g.fecha,detalle:g.detalle,resp:g.resp,total:Number(g.ars)||0,cuotas,xCuota:(Number(g.ars)||0)/cuotas};
+    })
+  ],[gastos]);
   const cuotasPorMes=useMemo(()=>{
     const map={};
-    CUOTAS_RAW.forEach(item=>{
+    tarjetaItems.forEach(item=>{
       for(let i=0;i<item.cuotas;i++){
         const{y,m}=addMonths(item.fecha,i);
         const key=`${y}-${String(m).padStart(2,"0")}`;
@@ -290,12 +308,15 @@ function TarjetaView({dolar}){
       }
     });
     return map;
-  },[]);
+  },[tarjetaItems]);
   const meses=useMemo(()=>Object.keys(cuotasPorMes).sort(),[cuotasPorMes]);
   const[expandido,setExpandido]=useState(null);
   const maxARS=Math.max(...Object.values(cuotasPorMes).map(v=>v.ars),1);
-  const totalGeneral=CUOTAS_RAW.reduce((s,i)=>s+i.total,0);
-  const cuotaMensual=602595.17;
+  const totalGeneral=tarjetaItems.reduce((s,i)=>s+i.total,0);
+  const cuotaMensual=Object.entries(cuotasPorMes).filter(([k])=>{
+    const [y,m]=k.split("-").map(Number);
+    return cuotaStatus(y,m)==="actual";
+  }).reduce((s,[,v])=>s+v.ars,0);
   const countPagadas =meses.filter(k=>{const[y,m]=k.split("-").map(Number);return cuotaStatus(y,m)==="pagada";}).length;
   const countActual  =meses.filter(k=>{const[y,m]=k.split("-").map(Number);return cuotaStatus(y,m)==="actual";}).length;
   const countPendiente=meses.filter(k=>{const[y,m]=k.split("-").map(Number);return cuotaStatus(y,m)==="pendiente";}).length;
@@ -380,13 +401,13 @@ function TarjetaView({dolar}){
       </div>
       <div className="card">
         <div style={{fontSize:"14px",fontWeight:500,marginBottom:"1rem"}}>Compras en cuotas</div>
-        {CUOTAS_RAW.map((item,i)=>{
+        {tarjetaItems.map((item,i)=>{
           const fin=addMonths(item.fecha,item.cuotas-1);
           const pagadas=Array.from({length:item.cuotas},(_,k)=>{
             const{y,m}=addMonths(item.fecha,k);return cuotaStatus(y,m)==="pagada";
           }).filter(Boolean).length;
           return(
-            <div key={i} style={{padding:"8px 0",borderBottom:i<CUOTAS_RAW.length-1?"0.5px solid #e0e0dc":"none"}}>
+            <div key={i} style={{padding:"8px 0",borderBottom:i<tarjetaItems.length-1?"0.5px solid #e0e0dc":"none"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"12px"}}>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:"13px",fontWeight:500}}>{item.detalle}</div>
@@ -785,6 +806,9 @@ function App(){
                     <span>{g.resp}</span>
                     <span style={{color:"#bbb"}}>·</span>
                     <span>{g.fecha}</span>
+                    <span style={{color:"#bbb"}}>·</span>
+                    <span className="tag">{g.medioPago||"Efectivo"}</span>
+                    {(g.medioPago||"Efectivo")==="Tarjeta"&&<span className="tag">{g.cuotas||1} cuota{(g.cuotas||1)!==1?"s":""}</span>}
                   </div>
                 </div>
                 <div style={{textAlign:"right",flexShrink:0}}>
@@ -867,7 +891,7 @@ function App(){
       )}
 
       {/* ── TARJETA ── */}
-      {tab==="tarjeta"&&<TarjetaView dolar={dolar}/>}
+      {tab==="tarjeta"&&<TarjetaView dolar={dolar} gastos={gastos}/>}
 
       {/* ── PROVEEDORES ── */}
       {tab==="proveedores"&&(
@@ -909,7 +933,7 @@ function App(){
       {modalNuevo&&<GastoModal gasto={null} dolar={dolar} onSave={agregarGasto} onClose={()=>setModalNuevo(false)} title="Nuevo pago"/>}
       {editingGasto&&(
         <GastoModal
-          gasto={{fecha:editingGasto.fecha,cat:editingGasto.cat,detalle:editingGasto.detalle,resp:editingGasto.resp,ars:String(editingGasto.ars),usd:String(editingGasto.usd)}}
+          gasto={{fecha:editingGasto.fecha,cat:editingGasto.cat,detalle:editingGasto.detalle,resp:editingGasto.resp,ars:String(editingGasto.ars),usd:String(editingGasto.usd),medioPago:editingGasto.medioPago||"Efectivo",cuotas:String(editingGasto.cuotas||1)}}
           dolar={dolar} onSave={guardarEdicion} onClose={()=>setEditingGasto(null)} title="Editar pago"
         />
       )}
