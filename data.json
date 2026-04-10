@@ -259,5 +259,23 @@
     "resp": "Liverpool Ferretería",
     "ars": 13500,
     "usd": 9.68
+  },
+  {
+    "id": 1775830665044,
+    "fecha": "2026-04-10",
+    "cat": "Materiales",
+    "detalle": "Arreglo Techo",
+    "resp": "REX",
+    "ars": 273500,
+    "usd": 196.06
+  },
+  {
+    "id": 1775830712250,
+    "fecha": "2026-04-10",
+    "cat": "Materiales",
+    "detalle": "Caños y Llaves Bañito",
+    "resp": "ACCESANIGA",
+    "ars": 296000,
+    "usd": 212.19
   }
 ]
